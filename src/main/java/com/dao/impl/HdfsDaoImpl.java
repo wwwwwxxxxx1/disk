@@ -1,7 +1,9 @@
 package com.dao.impl;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.beans.DiskFileInfo;
 import org.apache.hadoop.conf.Configuration;
@@ -172,6 +174,54 @@ public class HdfsDaoImpl implements HdfsDao{
         catch(Exception ex) {
             throw new RuntimeException(ex);
         }
+    }
+
+    //表示文件类型与扩展名的后缀对应关系
+    private static Map<String,String []> typeToFileExtMap ;
+
+    //要在静态代码块中初始
+    static {
+        typeToFileExtMap=new HashMap<String,String []>();
+        typeToFileExtMap.put("picture",new String[]{".jpeg",".bmp",".gif",".png",".tiff",".psd",".eps",".raw",".pdf",".png",".pxr",".mac",".jpg",".tga",".img",".pcd"});
+        typeToFileExtMap.put("txt",new String[]{".txt",".doc",".docx",".wps",".xls",".xlsx",".java",".pdf",".c",".h",".cpp",".xml",".log"});
+        typeToFileExtMap.put("avi",new String[]{".wmv",".avi",".wma",".rmvb",".rm",".flash",".mp4",".mid",".3gp",".mpg", ".mp2v",".mpv2",".m1v",".dat",".dsa",".mkv"});
+        typeToFileExtMap.put("sound",new String[]{".mp3",".wma",".avi",".rm",".rmvb",".flv",".mpg",".mov",".mkv"});
+        typeToFileExtMap.put("gz",new String[]{".gz",".zip",".rar",".z",".bz",".bz2",".7z",".mov",".mkv"});
+        typeToFileExtMap.put("torrent",new String[]{".torrent"});
+
+    }
+
+    //分类查询文件
+    public List<DiskFileInfo> getFileListByType(String userName, String fileType) {
+        List<DiskFileInfo> fileList=new ArrayList<>();
+
+        try {
+            String userPath=HDFS_PATH+userName;
+            FileSystem fs=FileSystem.get(URI.create(userPath),conf,USER_NAME);
+
+            //递归遍历
+            RemoteIterator<LocatedFileStatus> files = fs.listFiles(new Path(userPath), true);
+            while(files.hasNext()) {
+                LocatedFileStatus file = files.next();
+
+                //过滤出想要的类型的文件
+                String [] fileExtList =typeToFileExtMap.get(fileType);
+
+                for(String ext:fileExtList) {
+                    if(file.getPath().getName().toLowerCase().endsWith(ext)) {
+                        DiskFileInfo info=new DiskFileInfo(file);
+                        fileList.add(info);
+                        break;
+                    }
+                }
+            }
+        }
+
+        catch(Exception ex) {
+            throw new RuntimeException(ex);
+        }
+
+        return fileList;
     }
     public static void main(String[] args) {
         HdfsDaoImpl dao=new HdfsDaoImpl();

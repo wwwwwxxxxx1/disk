@@ -26,6 +26,7 @@
       <li><a href="HdfsServlet?flag=manage" target="centerFrame" ><img src="images/fileIcons/txtIcon.png" /> 资源</a></li>
       <li><a href="HdfsServlet?flag=manage" target="centerFrame" ><img src="images/fileIcons/txtIcon.png" /> 图表</a></li>
       <li><a href="HdfsServlet?flag=manage" target="centerFrame" ><img src="images/fileIcons/txtIcon.png" /> 日志</a></li>
+
       <li>
         <div class="aside-absolute">
           <div class="remaining">

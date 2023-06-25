@@ -38,7 +38,20 @@ public class HdfsServlet extends HttpServlet {
             createFolder(request,response);
         } else if("search".equals(flag)){
             search(request,response);
+        }else if ("searchFiles".equals(flag)){
+            searchFiles(request,response);
         }
+    }
+
+    private void searchFiles(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        UserInfo user=(UserInfo)request.getSession().getAttribute("session_user");
+
+        //取出要查询的文件的类型
+        String fileType=request.getParameter("type");
+        List<DiskFileInfo> hdfsFileList =hdfsDao.getFileListByType(user.getUserName(),fileType);
+        request.setAttribute("hdfsFileList", hdfsFileList);
+        request.getRequestDispatcher("center.jsp").forward(request, response);
+
     }
 
     private void manage(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
