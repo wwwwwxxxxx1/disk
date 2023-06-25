@@ -1,0 +1,549 @@
+===================================Lesson4 ================================================
+1 处理前台导航
+2 文件下载功能
+3 文件上传
+4 百分比计算
+5 删除文件
+6 新建文件夹
+7 文件搜索
+===========================================================================================
+
+==== 1 处理前台导航
+		 //点了文件夹以后,查出它的子文件
+	private void managerSubFiles(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+		String parent=request.getParameter("parent");  // 格式: /admin/java/lesson3  http://master:9000
+		//parent=parent.replace("hdfs://master:9000", "");   不需要
+
+		if(StrUtil.isNullOrEmpty(parent)) {
+			UserInfo user=(UserInfo)request.getSession().getAttribute("session_user");
+			parent=user.getUserName();
+		}
+
+		DiskFileInfo[] hdfsFileList= hdfsDao.getSubFileList(parent);
+		request.setAttribute("hdfsFileList", hdfsFileList);
+
+
+		//以下处理前台导航显示 类似     全部文件 |>java >Lesson7> doc
+		List<String> urlList=new ArrayList<String>();
+
+		urlList.add(parent);   //      /admin/java/lesson3/doc/d1
+
+		while(parent.lastIndexOf("/")!=-1) {
+			parent=parent.substring(0,parent.lastIndexOf("/"));
+			urlList.add(0,parent);
+
+		}
+		/*
+		/admin
+		/admin/java
+		/admin/java/lesson3
+		/admin/java/lesson3/doc
+		/admin/java/lesson3/doc/d1
+		*/
+
+		urlList.remove(0); //当前用户的用户目录没有必要在前台显示,所以移除
+
+		for(int i=0;i<urlList.size();i++) {
+			String str=urlList.get(i);
+			urlList.set(i,str+"_"+str.substring(str.lastIndexOf("/")+1));
+		}
+
+		/*
+		/admin/java_java
+		/admin/java/lesson3_lesson3
+		/admin/java/lesson3/doc_doc
+		/admin/java/lesson3/doc/d1_d1
+		*/
+
+		request.setAttribute("urlList", urlList);
+		request.getRequestDispatcher("center.jsp").forward(request, response);
+
+	}
+
+
+    前台
+  	 <%@ taglib uri="http://java.sun.com/jsp/jstl/functions" prefix="fn" %>
+
+    <a> 全部文件  | </a>
+    <c:forEach var="url" items="${urlList }">
+    	<a onclick='getSubFiles("${fn:split(url,"_")[0]}")'> &gt; ${fn:split(url,"_")[1]}   </a>
+    </c:forEach>
+
+
+	  前面留下的几个bug处理:
+	 1) 后台处理数据类型的时候
+	   DiskFileInfo 类中:
+	   添加字段:
+	   	public static final String HDFS_PATH="hdfs://master:9000/";
+
+			public String getPath() {
+				this.path=this.f.getPath().toString().replace(HDFS_PATH, "");
+				return path;
+			}
+
+			public String getName() {
+				this.name=this.f.getPath().getName().replace(HDFS_PATH, "");
+				return name;
+			}
+
+	 2) 	managerSubFiles 方法中的 parent=parent.replace("hdfs://master:9000", "");  不要了
+
+
+
+==== 2 文件下载功能
+
+     //下载
+      function download(uri){
+   	 	   window.location.href="  HdfsServlet?flag=download&fileName="+encodeURI(uri);
+      }
+
+      <a href="javascript:download('${fileInfo.path }')"><img src="images/b.png"  title="下载"  /></a>
+
+
+      控制层:
+			private void download(HttpServletRequest request, HttpServletResponse response) throws IOException {
+				String fileName=request.getParameter("fileName");
+				String downname=fileName.substring(fileName.lastIndexOf("/")+1);
+				response.setContentType("application/octet-stream; charset=utf-8");
+				response.addHeader("Content-Disposition", "attachment; filename="+ URLEncoder.encode(downname, "UTF-8"));
+				hdfsDao.downLoadFileAsStream(fileName, response.getOutputStream());
+			}
+
+
+			dao层:
+			/**
+			 * 下载文件
+			 * @param filePath 文件路径,格式如: admin/javatools/Test.txt
+			 * @param out servlet对应的输出流,用于下载
+			 */
+			public void downLoadFileAsStream(String fileName, ServletOutputStream out) {
+					try {
+								FileSystem fs = FileSystem.get(URI.create(HDFS_PATH),conf);
+				        Path path = new Path("/"+fileName);
+				        FSDataInputStream fsInput = fs.open(path);
+				        IOUtils.copyBytes(fsInput, out, 4096, false);
+				        out.flush();
+				        fsInput.close();
+					}
+					catch(Exception ex) {
+						throw new RuntimeException(ex);
+					}
+				}
+
+==== 3 文件上传
+    在 body 上加下面的表单
+     <form style="display:none" name="form1" action="HdfsServlet?flag=upload" method="post"  enctype="multipart/form-data"  >
+        <input type="text" id="parent"  name="parent"  value='${param.parent }'  />  <!-- 这句的位置一定要在下句之上, parent代表的是当前在哪个文件夹下 -->
+      	<input type="file" name="file1" id="btnFileUp" onchange="uploadFile()" style="display: block" />
+    </form>
+
+
+	 	<span>
+		  已全部加载，共  <label>11 </label>个
+	  </span>
+
+	   <img id="img1" style="display:none" src="images/processing.gif" />
+
+    修改上传按钮
+    <a  onclick="document.getElementById('btnFileUp').click();" class="active"><img src="images/upload.png"  />上传</a>
+
+     //上传文件
+     function uploadFile(){
+     		$("#img1").show();
+     		document.form1.submit();
+     }
+
+     记得工程中建一个 upload_files 文件夹
+
+//文件上传
+
+引入依赖
+    <dependency>
+			<groupId>commons-fileupload</groupId>
+			<artifactId>commons-fileupload</artifactId>
+			<version>1.4</version>
+		</dependency>
+
+
+		<dependency>
+			<groupId>org.apache.commons </groupId>
+			<artifactId>commons-lang3 </artifactId>
+			<version>3.9 </version>
+		</dependency>
+
+	private void upload(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+		DiskFileItemFactory factory = new DiskFileItemFactory();
+
+		// 设置内存缓冲区，超过后写入临时文
+		factory.setSizeThreshold(50 * 1024 * 1024); //50M
+
+		//设置上传到服务器上文件的临时存放目录 -- 非常重要，防止存放到系统盘造成系统盘空间不足,实测发现这个目录好象必须建好,不然出错,所以使用了默认目录
+		//factory.setRepository(new File("c:/uploadFileTemp"));  //默认值为 System.getProperty(“java.io.tmpdir”).
+
+		//创建一个新的文件上传处理程序
+		ServletFileUpload upload = new ServletFileUpload(factory);
+
+		upload.setHeaderEncoding("utf-8");
+
+		//设置上传文件最大为10G
+		upload.setSizeMax(10 * 1024 * 1024 * 1024); //10G
+
+		//解析获取新文件
+		List<FileItem> fileItems;
+		try {
+			fileItems = upload.parseRequest(request);
+			//得到上传的文件的父级路径
+			String parent = fileItems.get(0).getString("UTF-8");
+
+			//如果用户是在根路径上传
+			UserInfo user = null;
+			if (StrUtil.IsNullOrEmpty(parent)) {
+				user = (UserInfo) request.getSession().getAttribute("session_user");
+				parent = user.getUserName();
+			}
+
+			for (FileItem item : fileItems) {
+				if (item.isFormField()) {
+					/*如果是普通输入项 ,得到input中的name属性的值,和它对应的value
+					String name=item.getFieldName();
+					String value=item.getString("UTF-8");
+					System.out.println("name="+name+"  value="+value); */
+				}
+
+				else {
+					//上传的是文件，获得文件上传字段中的文件名
+					//注意IE或FireFox中获取的文件名是不一样的，IE中是绝对路径，FireFox中只是文件名。
+					String fileName = item.getName(); // D://aaa/bbb/c.txt
+
+					//将FileItem对象中保存的主体内容保存到某个指定的文件中。
+					// 如果FileItem对象中的主体内容是保存在某个临时文件中，该方法顺利完成后，临时文件有可能会被清除
+					fileName = fileName.substring(fileName.lastIndexOf("\\") + 1);
+					String localPath = getServletContext().getRealPath("/upload_files") + "/" + fileName;
+
+					item.write(new File(localPath));
+
+					hdfsDao.uploadFile(parent, localPath);
+
+					request.setAttribute("msg", "文件上传成功!");
+
+					//这句的作用是用来刷新磁盘使用百分比显示的
+			//		request.setAttribute("refreshScript", "window.parent.leftFrame.location.reload()");
+
+					//删除服务器(tomcat上的文件)
+					item.delete();
+
+					request.setAttribute("parent", parent);  //这句的目的是把paren传给下面的 manageSubFiles   要注意这里
+					manageSubFiles(request, response);
+				}
+			}
+
+		}
+
+		catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+
+		/**
+		 * 上传文件,从web服务器上上传文件到HDFS,传过后,将web服务器上的文件删除
+		 * @param parent 父级文件夹
+		 * @param localPath  本地文件路径 (这个路径,是在web服务器上,用来做临时中转的目录)
+		 */
+		public void uploadFile(String parent,String localPath) {
+			try{
+				FileSystem fs = FileSystem.get(URI.create(HDFS_PATH),conf,USER_NAME);
+				fs.moveFromLocalFile(new Path(localPath), new Path("/"+parent));
+				fs.close();
+			}
+			catch(Exception ex){
+				throw new RuntimeException(ex);
+			}
+		}
+
+
+//点了文件夹以后,查出它的子文件
+	private void manageSubFiles(HttpServletRequest request,HttpServletResponse response) throws ServletException, IOException {
+			String parent=request.getParameter("parent");   //admin/javatools/aaa/bbb/ccc
+			if(StrUtil.IsNullOrEmpty(parent)){
+
+				//如果用户是做文上传传后调有用的 manageSubFiles这个方法,这个 parent是不能通过 request.getParameter() 传过来的  所以这里添了这个
+				parent=(String) request.getAttribute("parent");
+				if(StrUtil.IsNullOrEmpty(parent)){
+					UserInfo user=(UserInfo)request.getSession().getAttribute("session_user");
+					parent=user.getUserName();
+				}
+			}
+
+
+			DiskFileInfo[] hdfsFileList = hdfsDao.getSubFileList(parent);
+			request.setAttribute("hdfsFileList", hdfsFileList);
+
+
+      //以下处理的是前台上面的 导航 类似:  javatools  > aaa  > bbb  > ccc 的呈现
+			List<String> urlList=new ArrayList<String>();
+			urlList.add(parent);
+
+			//处理完后,是  admin, admin/java, admin/java/lesson7 这样
+			while(parent.lastIndexOf("/")!=-1){
+				parent=	parent.substring(0,parent.lastIndexOf("/"));
+				urlList.add(0,parent );
+			}
+
+			urlList.remove(0);  //用户家目录没有必要在前台显示,所以排除
+
+			for (int i=0;i<urlList.size();i++) {
+				String str=urlList.get(i);
+				urlList.set(i,str+"_"+str.substring(str.lastIndexOf("/")+1));
+			}
+
+			request.setAttribute("urlList", urlList);
+			request.getRequestDispatcher("center.jsp").forward(request, response);
+	}
+
+==== 4 百分比计算
+  1) 将left.html换成left.jsp
+     <%@ page language="java" import="java.util.*,com.util.*,com.dao.*,com.dao.impl.*,com.beans.*" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+
+    ...
+
+		  <%
+		  	HdfsDao hdfsDao=new HdfsDaoImpl();
+		  	UserInfo user=(UserInfo)session.getAttribute("session_user");
+		  	float size=hdfsDao.getUserDiskSize(user.getUserName());
+			  String sizeStr=StrUtil.getSizeStr(size);
+		  	double percent = size/(1024*1024*1024);  //1G
+		   	String percentStr=	String.format("%.2f",percent*100);
+		   %>
+
+		   ...
+
+		    <span><%=sizeStr %> / 1 G</span>
+
+		   ...
+
+				下面是用来控制进度条的
+ 				<script>
+       	  $(".remainingSpace").css("width","<%=percentStr%>");
+       </script>
+
+	  	/**
+			 * 计算用户共有了多少网盘空间
+			 * @param userRoot 用户名
+			 * @return 点用的空间大小,单位为字节
+			 */
+			public long getUserDiskSize(String userRoot) {
+				try {
+					FileSystem fs = FileSystem.get(URI.create(HDFS_PATH), conf);
+					long size=fs.getContentSummary(new Path("/"+userRoot)).getLength();
+					fs.close();
+					return size;
+				}
+				catch (Exception ex) {
+					throw new RuntimeException(ex);
+				}
+			}
+
+		//StrUtil 中 把字节数格式成字符串
+		public static String getSizeStr(float size) {
+			if (size >= 1099511627776L) {
+				return String.format("%.2f", size / 1024 / 1024 / 1024 / 1024) + " P";
+			} else if (size >= 1073741824) {
+				return String.format("%.2f", size / 1024 / 1024 / 1024) + " G";
+			} else if (size >= 1048576) {
+				return String.format("%.2f", size / 1024 / 1024) + " M";
+			} else if (size > 1024) {
+				return String.format("%.2f", size / 1024) + " K";
+			} else {
+				return size + " Byte";
+			}
+		}
+
+
+  2) 在upload方法中,要加上
+  	//这句的作用是用来刷新磁盘使用百分比显示的
+		request.setAttribute("refreshScript", "window.parent.leftFrame.location.reload()");
+
+	3) 在center.jsp 上
+
+	    ${refreshScript};
+
+
+==== 5 删除文件
+		1)
+	     center.jsp上
+		   <a onclick="return delFile('${fileInfo.path}')" ><img src="images/c.png"  title="删除"  /></a>
+
+       //删除hdfs上的文件
+       function delFile(fileName){
+       		if(confirm('确定要删除吗')==true){
+       			 window.location.href=" HdfsServlet?flag=delete&fileName=" +encodeURI(fileName);
+       		}
+       }
+
+    2)
+		//删除文件或文件夹
+		    private void delete(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+				String fileName=request.getParameter("fileName");
+				String parent=fileName.substring(0,fileName.lastIndexOf("/")+1);
+
+				if(hdfsDao.deleteFile(fileName)==true){
+					request.setAttribute("msg", "删除成功");
+					request.setAttribute("parent", parent);
+
+					//这句的作用是用来刷新磁盘使用百分比显示的
+					request.setAttribute("refreshScript", "window.parent.leftFrame.location.reload()");
+
+					this.manageSubFiles(request,response);
+				}
+			}
+
+			/**
+		 * 删除HDFS上的文件或文件夹
+		 * @param 文件或文件夹的全路径
+		 * @return
+		 */
+		public boolean deleteFile(String filePath) {
+			try{
+				FileSystem fs = FileSystem.get(URI.create(HDFS_PATH),conf,USER_NAME);
+				String newPath="/"+filePath.replace(HDFS_PATH, "");
+				boolean result=fs.delete(new Path(newPath), true);  //若不用true ,文件夹非空,删不掉,true表示递归
+				fs.close();
+				return result;
+			}
+			catch(Exception ex){
+				throw new RuntimeException(ex);
+			}
+
+====6 新建文件夹
+   1) center.jsp 上
+     <a onclick="createNewTr()"><img src="images/createfolder.png"/>新建文件夹</a>
+
+      //点了新建文件夹以后,要动态的创建一行
+    	function createNewTr(){
+    		 $("#center_table tr").unbind("mouseover");
+    		 $("#center_table tr").removeClass("highlightTd");
+
+    	//   这里要禁用其他的按钮 ,待调试
+    	//	 $("body tr *").attr("readonly","readonly" );
+    	//	 $(".frame-nav *").attr("readonly","readonly" );
+
+     		var innerTD =
+       		   "<tr>"+
+       				"<td><img src='images/fileIcons/folder.png' /> <input id='txtFolderName'  value='请输入文件夹名称'> <button class='newrow-btn' onclick='mkDir()'>?</button>  <button  class='newrow-btn'  onclick='cancleCreateDir(this)'>X</button> </td><td></td><td></td><td></td>"
+       		  +"</tr>";
+
+       		 $("#center_table").prepend(innerTD);
+
+       		 document.getElementById("txtFolderName").select(); //让文本框内的文本默认被选中
+    	}
+
+    	function mkDir(){
+    		var parent=encodeURI($("#parent").val());
+    		var folderName=encodeURI($("#txtFolderName").val());
+    		var url="HdfsServlet?flag=createFolder&parent="+parent+"&folderName="+folderName;
+    		window.location.href=url;
+    	}
+
+    	//取消创建文件夹 (就是将这行移除)
+    	function cancleCreateDir(btn){
+    		$(btn).parent().parent().remove();
+    		initTrEvent();
+    	}
+
+    	${refreshScript}
+
+
+   2) 服务端
+		//创建文件夹
+			private void createFolder(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+				String parent=request.getParameter("parent");
+				String folderName=request.getParameter("folderName");
+
+				//如果用户是自已的根目录创建的
+				if(StrUtil.isNullOrEmpty(parent)) {
+					UserInfo user=(UserInfo)request.getSession().getAttribute("session_user");
+					parent=user.getUserName();
+				}
+
+				 boolean result=hdfsDao.createFolder(parent,folderName);
+				 if(result==true) {
+					 request.setAttribute("msg", "文件夹 "+folderName+" 创建成功");
+				 }
+				 else {
+					 request.setAttribute("msg", "存在同名目录,创建失败 ");
+				 }
+
+				request.setAttribute("parent", parent);
+				managerSubFiles(request, response);
+
+			}
+
+	3) hdfsDao
+			//创建目录
+				public boolean createFolder(String parent, String folderName) {
+					try{
+						FileSystem fs = FileSystem.get(URI.create(HDFS_PATH),conf,USER_NAME);
+						boolean result= fs.mkdirs(new Path("/"+parent+"/"+folderName));
+						fs.close();
+						return result;
+					}
+					catch(Exception ex){
+						throw new RuntimeException(ex);
+					}
+
+				}
+
+==== 7 文件搜索
+   1) 在 center.jsp 上
+
+      <div class="centerRight">
+        //这个form是新加的
+      	<form id="form1" action="HdfsServlet?flag=search" method="post">
+          <p>
+              <input type="text" name="fileName" placeholder="搜素你的文件" value="">
+              <img onclick="$('#form1').submit()" src="images/search.png"  title="搜索"  />
+          </p>
+          <img src="images/menu1.png">
+          <img src="images/menu2.png">
+          </form>
+      </div>
+
+  2) 服务端
+			//搜索文件
+			private void search(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+				String fileName=request.getParameter("fileName");
+				UserInfo user=(UserInfo)request.getSession().getAttribute("session_user");
+
+				List<DiskFileInfo> hdfsFileList= hdfsDao.getFileListByName(user.getUserName(),fileName);
+				request.setAttribute("hdfsFileList", hdfsFileList);
+				request.getRequestDispatcher("/center.jsp").forward(request, response);
+			}
+
+  3) dao层
+
+	//根据文件的名查询所有文件,不区分大小写
+	public List<DiskFileInfo> getFileListByName(String userName, String fileName) {
+		fileName=fileName.toLowerCase();
+		List<DiskFileInfo> fileList=new ArrayList<DiskFileInfo>();
+		try {
+			FileSystem fs = FileSystem.get(URI.create(HDFS_PATH), conf);
+
+			//这个方法后面的参数true 表示要用递归
+			RemoteIterator<LocatedFileStatus> files = fs.listFiles(new Path(HDFS_PATH+userName), true);
+
+			while(files.hasNext()) {
+				LocatedFileStatus file = files.next();
+				if(file.getPath().getName().toLowerCase().contains(fileName)) {
+					DiskFileInfo info=new DiskFileInfo(file);
+					fileList.add(info);
+				}
+			}
+
+			return fileList;
+		}
+		catch(Exception ex) {
+			throw new RuntimeException(ex);
+		}
+	}
+
