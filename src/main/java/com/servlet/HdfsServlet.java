@@ -61,7 +61,6 @@ public class HdfsServlet extends HttpServlet {
         request.setAttribute("hdfsFileList", hdfsFileList);
         request.setAttribute("RootDir",user.getUserName());
         request.getRequestDispatcher("/center.jsp").forward(request, response);
-        return;
     }
 
     //点了文件夹以后,查出它的子文件列表

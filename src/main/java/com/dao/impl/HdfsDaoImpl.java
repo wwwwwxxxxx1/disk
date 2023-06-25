@@ -177,7 +177,7 @@ public class HdfsDaoImpl implements HdfsDao{
     }
 
     //表示文件类型与扩展名的后缀对应关系
-    private static Map<String,String []> typeToFileExtMap ;
+    private static final Map<String,String []> typeToFileExtMap ;
 
     //要在静态代码块中初始
     static {
