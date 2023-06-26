@@ -7,10 +7,22 @@
         <filter-name>SessionFilter</filter-name>
         <filter-class>com.aop.SessionFilter</filter-class>
     </filter>
+
+<!--    <filter>-->
+<!--        <filter-name>logFilter</filter-name>-->
+<!--        <filter-class>com.aop.LogFilter</filter-class>-->
+<!--    </filter>-->
+
+<!--    <filter-mapping>-->
+<!--        <filter-name>logFilter</filter-name>-->
+<!--        <url-pattern>/*</url-pattern>-->
+<!--    </filter-mapping>-->
+
     <filter-mapping>
         <filter-name>SessionFilter</filter-name>
         <url-pattern>/*</url-pattern>
     </filter-mapping>
+
     <session-config>
         <session-timeout>20</session-timeout>
     </session-config>

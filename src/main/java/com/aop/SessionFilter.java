@@ -2,6 +2,7 @@ package com.aop;
 
 import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
 import java.io.IOException;
 
 /**
@@ -41,8 +42,23 @@ public class SessionFilter implements Filter {
                 return;
             }
         }
+        //处理直接访问 /linda-disk
+        if(uri.equals(contextPath)) {
+            chain.doFilter(request, response);
+            return;
+        }
 
+        //如果没有session,证明没有登录过
+        HttpSession session= req.getSession();
+        if(session.getAttribute("session_user")==null) {
+            String script="<script>alert('session timeout ! ');window.top.location.href='login.jsp'</script>";
+            response.getWriter().println(script);
+        }
+        else {
+            chain.doFilter(request, response);
+        }
     }
+
 
     @Override
     public void destroy() {
