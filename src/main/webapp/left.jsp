@@ -24,9 +24,6 @@
       <li><a href="HdfsServlet?flag=manage" target="centerFrame" ><img src="images/fileIcons/sourceCodeIcon.png" /> 源码</a></li>
       <li><a href="HdfsServlet?flag=manage" target="centerFrame" ><img src="images/fileIcons/programIcon.png" /> 项目</a></li>
       <li><a href="HdfsServlet?flag=manage" target="centerFrame" ><img src="images/fileIcons/txtIcon.png" /> 资源</a></li>
-      <li><a href="HdfsServlet?flag=manage" target="centerFrame" ><img src="images/fileIcons/txtIcon.png" /> 图表</a></li>
-      <li><a href="HdfsServlet?flag=manage" target="centerFrame" ><img src="images/fileIcons/txtIcon.png" /> 日志</a></li>
-
       <li>
         <div class="aside-absolute">
           <div class="remaining">
@@ -39,7 +36,7 @@
               float size=hdfsDao.getUserDiskSize(user.getUserName());
               String sizeStr=StrUtil.getSizeStr(size);
               double percent = size/(1024*1024*1024);  //1G
-              String percentStr=	String.format("%.2f",percent*100);
+              String percentStr=String.format("%.2f",percent*100);
             %>
             <span><%=sizeStr %> / 1 G</span>
           </div>
@@ -55,7 +52,19 @@
   </div>
 </div>
 <script>
-  $(".remainingSpace").css("width","<%=percentStr%>");
+  $(function (){
+    <%--$(".remainingSpace").css("width","<%=percentStr%>");--%>
+    let total= parseFloat($(".remaining").css("width"))
+    let percent =<%=percent%>
+            percent = total * percent;
+    $(".remainingSpace").css("width",percent);
+
+    $("li").click(function (){
+      $(this).children("a").addClass("active");
+      //给当前元素的兄弟元素去掉一个样式
+      $(this).siblings().children("a").removeClass("active");
+    })
+  })
 </script>
 
 
