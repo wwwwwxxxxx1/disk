@@ -36,6 +36,12 @@
                         window.location.href="UserServlet?flag=logout";
                     }
                 }
+                function f1(){
+                    window.top.leftFrame.location.href="left.jsp";
+                }
+                function f2(item){
+                    window.top.leftFrame.location.href="left-analyse.jsp";
+                }
             </script>
 
             <img src="images/icon1.png">

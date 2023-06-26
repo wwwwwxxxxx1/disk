@@ -23,7 +23,7 @@ public class SessionFilter implements Filter {
         String uri=req.getRequestURI();
         String contextPath=req.getContextPath();  //linda-disk
 
-        System.out.println(contextPath);
+        //System.out.println(contextPath);
 
         //以下这些路径不用过滤
         String [] excludePaths= {
