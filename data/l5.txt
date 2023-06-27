@@ -1,0 +1,805 @@
+====================================Lesson6 =======================================
+1 序列化,分组
+2 分区和排序
+3 wordcount示例
+=====================================================================================
+====1 序列化,分组
+/**
+本例用于演示序列化,排序,和分区 输入数据
+chepingping	上海	车平平	35	女
+mengtailing	广州	孟泰龄	50	男
+xubaofeng	北京	许宝凤	34	女
+yindebao	广州	尹德宝	69	男
+liudahua	北京	柳大华	46	男
+wanyuan	北京	王元	34	男
+huayigang	上海	华以刚	49	男
+wanyuan	北京	王元	22	男
+chepingping	上海	车平平	200	女
+huayigang	上海	华以刚	55	男
+mengtailing	广州	孟泰龄	67	男
+xubaofeng	北京	许宝凤	34	女
+lishishi	广州	李世石	89	男
+cuijing	上海	崔精	64	女
+chenglanru	北京	程兰如	34	男
+chepingping	上海	车平平	89	女
+fengyun	广州	风云	28	女
+liudahua	北京	柳大华	66	男
+xuyinchuan	深圳	许银川	75	男
+sumengzhen	上海	栗梦真	38	女
+yaoyongxun	广州	姚永寻	66	女
+yaoyongxun	广州	姚永寻	78	女
+zhaozhixun	日本	赵治勋	67	男
+zhaozhixun	日本	赵治勋	23	男
+zhaozhixun	日本	赵治勋	69	男
+wugongzhengshu	日本	武宫正树	55	男
+wugongzhengshu	日本	武宫正树	23	男
+zhongjinhui	韩国	仲瑾惠	44	女
+zhongjinhui	韩国	仲瑾惠	33	女
+zhanghe	深圳	仗和	62	男
+zhanghe	深圳	仗和	22	男
+banbenhuazhi	深圳	板本共织	39	女
+
+ */
+
+
+
+	1) 设计相关的实体类
+package com.beans;
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
+import org.apache.hadoop.io.WritableComparable;
+
+public class ScoreInfo implements WritableComparable<ScoreInfo> {
+	public  ScoreInfo() {
+	}
+
+	//生成一个带参的构造方法
+	public ScoreInfo(String idCard, String address, String name, int score, String gender) {
+		this.idCard = idCard;
+		this.address = address;
+		this.name = name;
+		this.score = score;
+		this.gender = gender;
+	}
+
+	//id
+	private String idCard;
+
+	//所属区域 (只有四个取值,北京,上海,广州,深圳)
+	private String address;
+
+	//名字
+	private String name;
+
+	//积分
+	private int score;
+
+	//性别
+	private String gender;
+
+  ...对应的get set方法,略
+
+	//序列化
+	public void write(DataOutput out) throws IOException {
+		out.writeUTF(this.idCard);
+		out.writeUTF(this.address);
+		out.writeUTF(this.name);
+		out.writeInt(this.score);
+		out.writeUTF(this.gender);
+	}
+
+	//反序列化
+	public void readFields(DataInput in) throws IOException {
+		this.idCard=in.readUTF();
+		this.address=in.readUTF();
+		this.name=in.readUTF();
+		this.score=in.readInt();
+		this.gender=in.readUTF();
+	}
+
+	//可以用这个方法进行对象的比较
+	public int compareTo(ScoreInfo o) {
+		if(this.score==o.score) {
+			return 0;
+		}
+
+		else if(this.score>o.score) {
+			return 1;
+		}
+		else {
+			return -1;
+		}
+	}
+
+	//不要忘了重写toString() 方法
+	public String toString() {
+		return this.address+"\t" +this.name+"\t"+this.score+"\t"+this.gender;
+	}
+
+}
+
+  2) 设计mapreduce 进行汇总
+package com.mapreduce;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+import com.beans.ScoreInfo;
+
+//分区,排序相关示例
+public class SortPartitionTest {
+	public static void main(String[] args) throws IOException, ClassNotFoundException, InterruptedException, URISyntaxException {
+		//建一个作业
+		Job job=Job.getInstance();
+
+		//指定main函数所在的类
+		job.setJarByClass(SortPartitionTest.class);
+
+		//设定map相关的信息
+		job.setMapperClass(TotalMapper.class);
+		job.setMapOutputKeyClass(Text.class);
+		job.setMapOutputValueClass(ScoreInfo.class);
+
+		//指定用户输入的文件的路径
+		Path path=new Path("hdfs://master:9000/admin/score.txt");
+		FileInputFormat.setInputPaths(job, path);
+
+		//设定reduce相关的信息
+		job.setReducerClass(TotalReduce.class);
+		job.setOutputKeyClass(Text.class);
+		job.setOutputValueClass(ScoreInfo.class);
+
+		//指明计算结果存放的位置
+		Path outputPath=new Path("hdfs://master:9000/admin/sortresulttmp");
+		FileOutputFormat.setOutputPath(job, outputPath);
+
+		//如果原来做过计算,先把原来生成的目录删除
+		Configuration conf=new Configuration();
+		URI uri=new URI("hdfs://master:9000");
+		FileSystem fs=	FileSystem.get(uri, conf, "root");
+		fs.delete(outputPath,true);
+
+		//提交作业 true 表示打印提示信息
+		job.waitForCompletion(true);
+
+		System.out.println("处理完成");
+
+	}
+
+	public static class TotalMapper extends Mapper<LongWritable,Text,Text,ScoreInfo>{
+		Text k2=new Text();
+
+		protected void map(LongWritable key, Text value, Context context)
+				throws IOException, InterruptedException {
+
+			//cuijing	上海	崔精	 64	女
+			String line=value.toString();
+			String [] data =line.split("\t");
+
+			ScoreInfo info=new ScoreInfo();
+			info.setIdCard(data[0]);
+			info.setAddress(data[1]);
+			info.setName(data[2]);
+			info.setScore(Integer.parseInt(data[3]));
+			info.setGender(data[4]);
+
+
+			k2.set(info.getIdCard());
+			context.write(k2, info);
+		}
+	}
+
+	public static class TotalReduce extends Reducer<Text,ScoreInfo,Text,ScoreInfo >{
+		int totalScore=0;
+		int i=0;
+		ScoreInfo info;
+		protected void reduce(Text key, Iterable<ScoreInfo> values,
+					Context context) throws IOException, InterruptedException {
+			for(ScoreInfo o:values) {
+				//其为同一组的中的数据,除了分数外,其他的基本信息都是相同的,所以取第一个数据的信息就可以
+				if(i==0) {
+					info=o;
+				}
+				totalScore+=o.getScore();
+				i++;
+			}
+
+			info.setScore(totalScore);
+
+			context.write(key, info);
+
+			totalScore=0;
+			i=0;
+		}
+	}
+}
+
+ 汇总后的结果:
+banbenhuazhi	深圳	板本共织	39	女
+chenglanru	北京	程兰如	34	男
+chepingping	上海	车平平	324	女
+cuijing	上海	崔精	64	女
+fengyun	广州	风云	28	女
+huayigang	上海	华以刚	104	男
+lishishi	广州	李世石	89	男
+liudahua	北京	柳大华	112	男
+mengtailing	广州	孟泰龄	117	男
+sumengzhen	上海	栗梦真	38	女
+wanyuan	北京	王元	56	男
+wugongzhengshu	日本	武宫正树	78	男
+xubaofeng	北京	许宝凤	68	女
+xuyinchuan	深圳	许银川	75	男
+yaoyongxun	广州	姚永寻	144	女
+yindebao	广州	尹德宝	69	男
+zhanghe	深圳	仗和	84	男
+zhaozhixun	日本	赵治勋	159	男
+zhongjinhui	韩国	仲瑾惠	77	女
+
+
+==== 2 分区和排序
+//分区,排序相关示例
+public class SortPartitionTest {
+	public static void main(String[] args) throws IOException, ClassNotFoundException, InterruptedException, URISyntaxException {
+		//建一个作业
+		Job job=Job.getInstance();
+
+		//指定main函数所在的类
+		job.setJarByClass(SortPartitionTest.class);
+
+		//设定map相关的信息
+		job.setMapperClass(TotalMapper.class);
+		job.setMapOutputKeyClass(Text.class);
+		job.setMapOutputValueClass(ScoreInfo.class);
+
+		//指定用户输入的文件的路径
+		Path path=new Path("hdfs://master:9000/admin/score.txt");
+		FileInputFormat.setInputPaths(job, path);
+
+		//设定reduce相关的信息
+		job.setReducerClass(TotalReduce.class);
+		job.setOutputKeyClass(Text.class);
+		job.setOutputValueClass(ScoreInfo.class);
+
+		//指明计算结果存放的位置
+		Path outputPath=new Path("hdfs://master:9000/admin/sortresulttmp");
+		FileOutputFormat.setOutputPath(job, outputPath);
+
+		//如果原来做过计算,先把原来生成的目录删除
+		Configuration conf=new Configuration();
+		URI uri=new URI("hdfs://master:9000");
+		FileSystem fs=	FileSystem.get(uri, conf, "root");
+		fs.delete(outputPath,true);
+
+		//提交作业 true 表示打印提示信息
+		job.waitForCompletion(true);
+
+		//创建第二个作业 (进行排序)
+		Job job2=Job.getInstance();
+		job2.setJarByClass(SortPartitionTest.class);
+
+		//指定Map相关的配置
+		job2.setMapperClass(SortMapper.class);
+		job2.setMapOutputKeyClass(ScoreInfo.class);
+		job2.setMapOutputValueClass(Text.class);
+
+		//指定第二个map要读入的文件是哪个
+		Path path3=new Path("hdfs://master:9000/admin/sortresulttmp/part-r-00000");
+		FileInputFormat.setInputPaths(job2, path3);
+
+		job2.setOutputKeyClass(ScoreInfo.class);
+		job2.setOutputValueClass(Text.class);
+
+		//指定最终的结果存放地址
+		Path path4=new Path("hdfs://master:9000/admin/sortresult");
+		FileOutputFormat.setOutputPath(job2, path4);
+
+		//开启分区
+		job2.setNumReduceTasks(5);
+		job2.setPartitionerClass(MyPartition.class);
+
+		fs.delete(path4,true);
+
+		boolean result= job2.waitForCompletion(true);
+
+		System.out.println(result?"统计成功":"统计失败");
+
+	}
+
+	public static class TotalMapper extends Mapper<LongWritable,Text,Text,ScoreInfo>{
+		Text k2=new Text();
+
+		protected void map(LongWritable key, Text value, Context context)
+				throws IOException, InterruptedException {
+
+			//cuijing	上海	崔精	 64	女
+			String line=value.toString();
+			String [] data =line.split("\t");
+
+			ScoreInfo info=new ScoreInfo();
+			info.setIdCard(data[0]);
+			info.setAddress(data[1]);
+			info.setName(data[2]);
+			info.setScore(Integer.parseInt(data[3]));
+			info.setGender(data[4]);
+
+
+			k2.set(info.getIdCard());
+			context.write(k2, info);
+		}
+	}
+
+	public static class TotalReduce extends Reducer<Text,ScoreInfo,Text,ScoreInfo >{
+		int totalScore=0;
+		int i=0;
+		ScoreInfo info;
+		protected void reduce(Text key, Iterable<ScoreInfo> values,
+					Context context) throws IOException, InterruptedException {
+			for(ScoreInfo o:values) {
+				//其为同一组的中的数据,除了分数外,其他的基本信息都是相同的,所以取第一个数据的信息就可以
+				if(i==0) {
+					info=o;
+				}
+				totalScore+=o.getScore();
+				i++;
+			}
+
+			info.setScore(totalScore);
+
+			context.write(key, info);
+
+			totalScore=0;
+			i=0;
+		}
+	}
+
+	public static class SortMapper extends Mapper<LongWritable,Text,ScoreInfo,Text>{
+
+		ScoreInfo info=new ScoreInfo();
+		Text k2=new Text();
+
+		protected void map(LongWritable key, Text value, Context context)
+				throws IOException, InterruptedException {
+	       //zhongjinhui	韩国	仲瑾惠	77	女
+			String line=value.toString();
+			String [] data=line.split("\t");
+
+			info.setIdCard(data[0]);
+			info.setAddress(data[1]);
+			info.setName(data[2]);
+			info.setScore(Integer.parseInt(data[3]));
+			info.setGender(data[4]);
+			k2.set(info.getIdCard());
+
+			context.write(info, k2);    //zhongjinhui	韩国	仲瑾惠	77	女   zhongjinhui
+		}
+
+	}
+
+	public static class MyPartition extends Partitioner<ScoreInfo,Text>{
+		public int getPartition(ScoreInfo key , Text value , int numPartitions) {
+			String addr=key.getAddress();
+
+			if(addr.equals("北京")) {
+				return 0;
+			}
+			if(addr.equals("上海")) {
+				return 1;
+			}
+			if(addr.equals("广州")){
+				return 2;
+			}
+			if(addr.equals("深圳")) {
+				return 3;
+			}
+			else {
+				return 4;
+			}
+		}
+	}
+}
+
+
+===3 wordcount示例
+   1) 发起请求
+
+      <li><a href="HdfsServlet?flag=manage"  target="centerFrame" class="active"><img src="images/fileIcons/all.png" />数据分析</a></li>
+      <li><a href="MapReduceServlet?flag=searchFilesForWordCount&type=txt" target="centerFrame" ><img src="images/fileIcons/icon0.png" />MR-WORDCOUNT</a></li>
+
+   2) 控制层
+			//分类查看文件,转到文件分析列表页
+			private void searchFilesForWordCount(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+				UserInfo user=(UserInfo)request.getSession().getAttribute("session_user");
+
+				String fileType=request.getParameter("type");
+				List<DiskFileInfo> hdfsFileList =hdfsDao.getFileListByType(user.getUserName(),fileType);
+
+				request.setAttribute("hdfsFileList", hdfsFileList);
+				request.getRequestDispatcher("/mapreduce/file-list-wordcount.jsp").forward(request, response);
+			}
+
+   3) 创建 mapreduce/file-list-wordcount.jsp
+<%@ page language="java" import="java.util.*, org.apache.hadoop.fs.*" pageEncoding="UTF-8"%>
+<%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c" %>
+<%@ taglib prefix="fn" uri="http://java.sun.com/jsp/jstl/functions" %>
+<%
+String path = request.getContextPath();
+String basePath = request.getScheme()+"://"+request.getServerName()+":"+request.getServerPort()+path+"/";
+%>
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <base href="<%=basePath%>">
+
+    <title>海康云盘系统</title>
+
+    <link rel="stylesheet" href="css/poposlides.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <script src="js/jquery-2.1.4.min.js" ></script>
+
+    <script>
+
+       //点击文件夹时,要打开它的子级页面
+       function getSubFiles( parent){
+       		window.location.href="HdfsServlet?flag=manageSubFiles&parent="+ encodeURI(parent);
+       }
+
+       function initTrEvent(){
+     	 	$("#center_table tr").mouseover(
+     	 		function(){
+					$(this).siblings().removeClass("highlightTd");
+					$(this).addClass("highlightTd");
+					$(this).find("div").show();  //显示出对该文件的操作按钮,有分享,下载,删除三个按钮
+					$(this).siblings().find("div").hide();
+			});
+     }
+
+     $(function(){
+           initTrEvent();
+      });
+
+     function wordcount(filePath){
+    	 var encodePath=encodeURI(filePath);
+    	// alert(encodePath);
+    	 window.location.href="mapreduce/word-count-result.jsp?filePath="+encodePath;
+     }
+
+    </script>
+  </head>
+
+  <body>
+   <div class="frame-center">
+
+            <div class="frame-title">
+        	   <span>
+	        	    <a href="HdfsServlet?flag=manage"> 全部文件  | MR-WordCount</a>
+	              	<c:forEach  var="url" items="${urlList }">
+	              		<a onclick='getSubFiles("${fn:split(url,"_")[0] }")'>  &gt;  ${fn:split(url,"_")[1]}  </a>
+	              	</c:forEach>
+              	</span>
+              	<span>
+            		  已全部加载，共  <label>${fn:length(hdfsFileList)} </label>个
+                </span>
+                <img id="img1" style="display:none" src="images/processing.gif" />
+            </div>
+
+            <div class="tab">
+                <table>
+                    <tr>
+                        <td> 可分析文件</td>
+                        <td></td>
+                        <td>大小</td>
+                        <td>修改日期</td>
+                    </tr>
+                </table>
+
+                <div class="datas">
+	                <table id="center_table">
+	                	<c:forEach var="f" items="${hdfsFileList}">
+	                	 <tr>
+	                	    <td>
+	                	       &nbsp; <img src="images/fileIcons/${f.icon }">
+	                	        <label  <c:if test="${f.f.directory==true }" > onclick="getSubFiles('${f.path}')" </c:if> > ${f.name }</label>
+	                	     </td>
+	                	      <td >
+	                	        <div>
+	                	        	<a href="javascript:wordcount('${f.path }')"><img src="images/a.png" title="词频分析"  />词频分析</a>
+	                	         </div>
+	                	      </td>
+	                        <td>${f.len}</td>
+	                        <td>${f.modifcationTime}</td>
+	                        </tr>
+	                	</c:forEach>
+	                </table>
+                </div>
+            </div>
+        </div>
+  </body>
+</html>
+
+
+   4)
+    function wordcount(filePath){
+    	 var encodePath=encodeURI(filePath);
+    	 window.location.href="mapreduce/word-count-result.jsp?filePath="+encodePath;
+     }
+
+   5) word-count-result.jsp
+
+<script>
+	$(function() {
+		render();
+	});
+
+
+	function render() {
+		// Result <List<List<Order>>
+		$.ajax({
+			url : "MR_WordCountServlet",
+			dataType : "json",
+			data:{filePath:'${param.filePath}'},  //要注意,它是从上个页面选的文件
+			success : function(wordCountList) {
+				$("#imgwait").hide();
+				//横轴,名称
+				var array1 = new Array();
+
+				//纵轴,访问量
+				var array2 = new Array();
+
+				for (var i = 0; i < wordCountList.length; i++) {
+					array1.push(wordCountList[i].word);
+					array2.push(wordCountList[i].count);
+				}
+
+				var myChart1 = echarts.init(document.getElementById('caigou_div_top12'));
+
+				initChart(myChart1, array1, array2, "文件词频分析", "#4D97FF");
+
+			}
+		})
+	}
+
+
+	function initChart(myChart, array1, array2, title, color) {
+		// 指定图表的配置项和数据
+		var option = {
+			color : [ color ],
+			backgroundColor : '#F9F9F9',
+
+			title : [ {
+				text : title,
+				left : '470',
+				top : '15',
+				textStyle : {
+					fontSize : 16,
+					color : '#A30014',
+				},
+
+			}, {
+				text : "数据排行",
+				left : '590',
+				top : '15',
+				textStyle : {
+					fontSize : 16
+				}
+			} ],
+
+			tooltip : {},
+
+			xAxis : {
+				//	type:"category",
+				data : array1,
+				splitLine : {
+					show : true,
+					lineStyle : {
+						color : [ '#D9D9D9' ],
+						width : 1,
+						type : 'solid'
+					}
+				}
+			},
+			yAxis : {
+				//type:'value',
+				//网格样式
+				splitLine : {
+					show : true,
+					lineStyle : {
+						color : [ '#D9D9D9' ],
+						width : 1,
+						type : 'solid'
+					}
+				}
+			},
+			series : [ {
+				label : {
+					show : true,//是否显示数值
+					//rotate : 60,//数值是否旋转
+					position : 'top'//设置显示数值位置 top：顶部 bottom：底部
+				},
+
+				name : title.substring(0, 4),
+				type : 'bar',
+				data : array2
+			},
+
+			]
+		};
+
+		// 使用刚指定的配置项和数据显示图表。
+		myChart.setOption(option);
+	}
+
+
+</script>
+</head>
+
+<body>
+	<div class="wrap">
+		<div class="x-nav">
+			<div class="title">
+				<a><cite>MR-WordCount示例</cite></a>
+			</div>
+		</div>
+		<div class="x-body">
+			<div class="content">
+					<div class="monthly">
+						<p>
+						  <a href="javascript:window.history.back()"   > <img width="25" src="images/fileIcons/back.png" ></a>&nbsp;	&nbsp;	&nbsp;	&nbsp;<label for="sel" style="color:#A30014;font-weight:bold;font-family: 'Montserrat', sans-serif">词频分析 >${param.filePath} </label>
+						</p>
+						<hr />
+
+						<div>
+							 <img id="imgwait"   src="images/processing.gif" />
+							<div id="caigou_div_top12" style="width: 1080px; height: 400px;"></div>
+						</div>
+
+					</div>
+				</div>
+		</div>
+	</div>
+
+</body>
+</html>
+
+  4) Servlet 中
+import net.sf.json.JSONArray;
+
+@WebServlet("/MR_WordCountServlet")
+public class MR_WordCountServlet extends HttpServlet {
+
+	@Override
+	protected void service(HttpServletRequest request, HttpServletResponse response)  {
+		try {
+		//	System.setProperty("HADOOP_USER_NAME","root");
+			// 创建一个作业
+			Job job = Job.getInstance();
+
+			// 指定main函数所在的类
+		//	job.setJarByClass(WordCountTest.class);
+
+			// 设定map 相关的配置
+			job.setMapperClass(WordCountMapper.class);
+			job.setMapOutputKeyClass(Text.class);
+			job.setMapOutputValueClass(LongWritable.class);
+
+
+			FileInputFormat.setInputPaths(job, new Path("hdfs://master:9000/"+filePath));
+
+			// 设定 reduce 相关的配置
+			job.setReducerClass(WordCountMyReducer.class);
+			job.setOutputKeyClass(Text.class);
+			job.setOutputValueClass(LongWritable.class);
+
+			// 因为如果目标目录存在,将出错,所以可以先将目标删除
+			URI uri = new URI("hdfs://master:9000");
+			Configuration conf = new Configuration();
+			FileSystem fs = FileSystem.get(uri, conf);
+
+			fs.delete(new Path("/workcounttmp"), true);
+
+			// 指明计算完成以后,输出结果放在哪里
+			FileOutputFormat.setOutputPath(job, new Path("hdfs://master:9000/workcounttmp"));
+
+			// 提交作业
+			job.waitForCompletion(true); // true 表示在执行作业的时候输出提示信
+
+			System.out.println("WordCount Mapreduce 任务执行完毕");
+
+	        Path path = new Path("hdfs://master:9000/workcounttmp/part-r-00000");
+	        FSDataInputStream fsInput = fs.open(path);
+
+	        BufferedReader br=new BufferedReader(new InputStreamReader(fsInput,"utf-8"));
+
+	        List<WordCountInfo> wordCountList=new ArrayList<>();
+	        String str=null;
+
+	        while((str=br.readLine())!=null) {
+	        	System.out.println(str);
+	        	String [] data=str.split("\t");
+
+	        	String word=data[0];
+	        	Integer count=0;
+	        	try {
+	        		count=Integer.parseInt(data[1]);
+	        	}
+	        	catch(Exception ex) {
+	        	}
+	            wordCountList.add(new WordCountInfo(word,count));
+	        }
+
+	        br.close();
+	        fsInput.close();
+
+	        JSONArray jsonobj=JSONArray.fromObject(wordCountList);
+	        response.setContentType("text/html;charset=utf-8");
+	        response.getWriter().println(jsonobj);
+
+	        fs.close();
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+	}
+
+	// KEYIN LongWritable key 代表行号
+	// VALUEIN Text value 代表当前进行处理的那行数据
+	// KEYOUT 往后面写的key的类型
+	// VALUEOUT 往后面写的value的类型
+	static class WordCountMapper extends Mapper<LongWritable, Text, Text, LongWritable> {
+
+		protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
+			String line = value.toString();
+			String[] wordList = line.split(" ");
+
+			for (String word : wordList) {
+				context.write(new Text(word), new LongWritable(1));
+			}
+		}
+	}
+
+	static class WordCountMyReducer extends Reducer<Text, LongWritable, Text, LongWritable> {
+		LongWritable n = new LongWritable();
+		long count = 0;
+
+		protected void reduce(Text key, Iterable<LongWritable> values, Context context)
+				throws IOException, InterruptedException {
+
+			for (LongWritable i : values) {
+				count += i.get();
+			}
+
+			n.set(count);
+			context.write(key, n);
+		}
+	}
+}
+
+
+   问题:
+    java.lang.UnsatisfiedLinkError: org.apache.hadoop.io.nativeio.NativeIO$Windows.access0(Ljava/lang/String;I)Z
+
+    在工程中,建一个包,名为
+      org.apache.hadoop.io.nativeio
+
+      然后里面建一个类 (其实就是把源码中这个包中的NativeIO.java这个源文件复制过来 )
+        NativeIO.java
+
+  	修改它的代码
+      public static boolean access(String path, AccessRight desiredAccess)
+        throws IOException {
+     // return access0(path, desiredAccess.accessRight());  //这里
+    	  return true;
+      }
