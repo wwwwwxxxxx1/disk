@@ -94,7 +94,7 @@
                             </div>
                         </td>
                         <td>${f.len}</td>
-                        <td>${f.modifcationTime}</td>
+                        <td>${f.modificationTime}</td>
                     </tr>
                 </c:forEach>
             </table>

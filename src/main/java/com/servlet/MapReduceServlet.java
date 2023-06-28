@@ -16,7 +16,7 @@ import javax.servlet.annotation.*;
 import java.io.IOException;
 import java.util.List;
 
-@WebServlet("/MapReducrServlet")
+@WebServlet("/MapReduceServlet")
 public class MapReduceServlet extends HttpServlet {
 
     private HdfsDao hdfsDao = new HdfsDaoImpl();
