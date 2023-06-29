@@ -27,6 +27,9 @@ public class MapReduceServlet extends HttpServlet {
         if("searchFilesForWordCount".equals(flag)){
             searchFilesForWordCount(request,response);
         }
+        else if("removeRepeat".equals(flag)){
+            removeRepeat(request,response);
+        }
     }
     private void searchFilesForWordCount(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException, ServletException, IOException {
         UserInfo user=(UserInfo)request.getSession().getAttribute("session_user");
@@ -36,5 +39,15 @@ public class MapReduceServlet extends HttpServlet {
 
         request.setAttribute("hdfsFileList", hdfsFileList);
         request.getRequestDispatcher("/mapreduce/file-list-wordcount.jsp").forward(request, response);
+    }
+    private void removeRepeat(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        UserInfo user=(UserInfo)request.getSession().getAttribute("session_user");
+
+        String fileType=request.getParameter("type");
+        List<DiskFileInfo> hdfsFileList =hdfsDao.getFileListByType(user.getUserName(),fileType);
+
+        request.setAttribute("hdfsFileList", hdfsFileList);
+        request.getRequestDispatcher("/mapreduce/file-list-removerepeat.jsp").forward(request, response);
+
     }
 }
