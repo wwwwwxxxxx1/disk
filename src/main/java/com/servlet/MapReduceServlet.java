@@ -30,6 +30,12 @@ public class MapReduceServlet extends HttpServlet {
         else if("removeRepeat".equals(flag)){
             removeRepeat(request,response);
         }
+        else if("searchFilesForSort".equals(flag)){
+            searchFilesForSort(request,response);
+        }
+        else if("searchFilesForPartSort".equals(flag)){
+            searchFilesForPartSort(request,response);
+        }
     }
     private void searchFilesForWordCount(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException, ServletException, IOException {
         UserInfo user=(UserInfo)request.getSession().getAttribute("session_user");
@@ -49,5 +55,23 @@ public class MapReduceServlet extends HttpServlet {
         request.setAttribute("hdfsFileList", hdfsFileList);
         request.getRequestDispatcher("/mapreduce/file-list-removerepeat.jsp").forward(request, response);
 
+    }
+    private void searchFilesForSort(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        UserInfo user=(UserInfo)request.getSession().getAttribute("session_user");
+
+        String fileType=request.getParameter("type");
+        List<DiskFileInfo> hdfsFileList =hdfsDao.getFileListByType(user.getUserName(),fileType);
+
+        request.setAttribute("hdfsFileList", hdfsFileList);
+        request.getRequestDispatcher("/mapreduce/file-list-sort.jsp").forward(request, response);
+    }
+    private void searchFilesForPartSort(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        UserInfo user=(UserInfo)request.getSession().getAttribute("session_user");
+
+        String fileType=request.getParameter("type");
+        List<DiskFileInfo> hdfsFileList =hdfsDao.getFileListByType(user.getUserName(),fileType);
+
+        request.setAttribute("hdfsFileList", hdfsFileList);
+        request.getRequestDispatcher("/mapreduce/file-list-partsort.jsp").forward(request, response);
     }
 }

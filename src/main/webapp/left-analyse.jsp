@@ -31,10 +31,10 @@
             <li><a href="HdfsServlet?flag=manage"  target="centerFrame" class="active"><img src="images/fileIcons/all.png" />数据分析</a></li>
             <li><a href="MapReduceServlet?flag=searchFilesForWordCount&type=txt" target="centerFrame" ><img src="images/fileIcons/icon0.png" />MR-WORDCOUNT</a></li>
             <li><a href="MapReduceServlet?flag=removeRepeat&type=txt" target="centerFrame" ><img src="images/fileIcons/icon0.png" />MR-去重复示例</a></li>
-            <li><a href="" target="centerFrame" ><img src="images/fileIcons/icon0.png" />MR-排序示例</a></li>
-            <li><a href="" target="centerFrame" ><img src="images/fileIcons/icon0.png" />MR-分区计算示例</a></li>
+            <li><a href="MapReduceServlet?flag=searchFilesForSort&type=txt" target="centerFrame" ><img src="images/fileIcons/icon0.png" />MR-排序示例</a></li>
+            <li><a href="MapReduceServlet?flag=searchFilesForPartSort&type=txt" target="centerFrame" ><img src="images/fileIcons/icon0.png" />MR-分区计算示例</a></li>
             <li><a href="" target="centerFrame" ><img src="images/fileIcons/icon0.png" />MR-日志分析示例</a></li>
-            <li><a href="" target="centerFrame" ><img src="images/fileIcons/icon0.png" />HIVE-分析示例</a></li>
+            <li><a href="HiveServlet?flag=searchLogFiles" target="centerFrame" ><img src="images/fileIcons/icon0.png" />HIVE-分析示例</a></li>
             <li><a href="" target="centerFrame" ><img src="images/fileIcons/icon0.png" />SPARK-分析示例</a></li>
             <li><a href="" target="centerFrame" ><img src="images/fileIcons/icon0.png" />FLUME-示例</a></li>
             <li><a href="" target="centerFrame" ><img src="images/fileIcons/icon0.png" />SCOOP-传输示例</a></li>
