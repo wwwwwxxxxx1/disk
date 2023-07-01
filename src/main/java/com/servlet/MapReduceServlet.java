@@ -35,6 +35,8 @@ public class MapReduceServlet extends HttpServlet {
         }
         else if("searchFilesForPartSort".equals(flag)){
             searchFilesForPartSort(request,response);
+        }else if ("logAnalyse".equals(flag)){
+            logAnalyse(request,response);
         }
     }
     private void searchFilesForWordCount(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException, ServletException, IOException {
@@ -73,5 +75,16 @@ public class MapReduceServlet extends HttpServlet {
 
         request.setAttribute("hdfsFileList", hdfsFileList);
         request.getRequestDispatcher("/mapreduce/file-list-partsort.jsp").forward(request, response);
+    }
+    private void logAnalyse(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException{
+        UserInfo user=(UserInfo) request.getSession().getAttribute("session_user");
+
+        //约定好,日志文件必须放在每个用户的 log目录下
+        String parent=user.getUserName()+"/log";
+
+        DiskFileInfo[] hdfsFileList = hdfsDao.getSubFileList(parent);
+        request.setAttribute("hdfsFileList", hdfsFileList);
+
+        request.getRequestDispatcher("/mapreduce/file-log-analyse.jsp").forward(request,response);
     }
 }

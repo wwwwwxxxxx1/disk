@@ -40,6 +40,8 @@
                 function(){
                     $(this).siblings().removeClass("highlightTd");
                     $(this).addClass("highlightTd");
+                    $(this).find("div").show(); //显示出分享,下载,删除
+                    $(this).siblings().find("div").hide();
 
                 });
         }
@@ -47,6 +49,13 @@
         $(function(){
             initTrEvent();
         });
+
+        function delFile(fileName){
+            if(confirm('确定要删除吗')==true){
+                window.location.href=" HiveServlet?flag=delete&fileName=" +encodeURI(fileName);
+            }
+        }
+        ${refreshScript}
 
 
 
@@ -74,7 +83,7 @@
                 <td id="td-operator">
                     <a href="javascript:$('#img1').show(); window.location.href='Hive_LogTableServlet' "><img src="images/upload.png"  />查看表格</a>
                     <a href="hive/log-group-result.jsp"><img src="images/download.png"/>访问量排序</a>
-                    <a class="active"><img src="images/download.png" />排序展示</a>
+                    <a href="javascript:$('#img1').show(); window.location.href='Log_20_HiveServlet' "><img src="images/download.png" />访问量前20排序(10个)</a>
                     <a><img src="images/machine.png" />图表展示</a>
                 </td>
                 <td >
@@ -91,13 +100,18 @@
         <div class="datas">
             <table id="center_table">
                 <c:forEach var="f" items="${hdfsFileList}">
-                    <tr>
+                    <tr class="highlightTd">
                         <td>
-                            &nbsp; <img src="images/fileIcons/${f.icon }">
-                            <label> ${f.name }</label>
+                            &nbsp; <input type="checkbox"><img src="images/fileIcons/${f.icon}">
+                            <label>
+                                    ${f.name }
+                            </label>
                         </td>
                         <td >
-
+                            <div>
+                                <a><img src="images/a.png" title="分享"  /></a>
+                                <a onclick="return delFile('${f.path}')" ><img src="images/c.png"  title="删除"  /></a>
+                            </div>
                         </td>
                         <td>${f.len}</td>
                         <td>${f.modificationTime}</td>

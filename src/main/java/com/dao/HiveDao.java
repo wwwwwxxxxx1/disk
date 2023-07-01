@@ -15,4 +15,5 @@ public interface HiveDao {
     List<LogInfo> getLogList(String userName);
 
     List<LogGroupInfo> getLogGroupList(String userName);
+    List<LogGroupInfo> get_ershi(String userName);
 }

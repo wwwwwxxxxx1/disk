@@ -99,4 +99,36 @@ public class HiveDaoImpl implements HiveDao {
 
         return list;
     }
+
+    //20 10ip
+    public List<LogGroupInfo> get_ershi(String userName){
+
+        //从表格中提取数据
+        List<LogGroupInfo> list=new ArrayList<>();
+
+        Connection conn =null;
+        Statement stm=null;
+        ResultSet rs=null;
+
+        try {
+            conn=HiveDBUtil.getConn();
+            stm=conn.createStatement();
+            rs=stm.executeQuery("select ip , count(*) as visit_count from access_logs group by ip order by visit_count desc limit 10");
+
+            while(rs.next()) {
+                LogGroupInfo info=new LogGroupInfo();
+                info.setIp(rs.getString("ip"));
+                info.setCount(rs.getInt("visit_count"));
+
+                list.add(info);
+            }
+        }catch(Exception ex) {
+            ex.printStackTrace();
+        }finally{
+            HiveDBUtil.close(rs, stm, conn);
+        }
+
+        return list;
+    }
+
 }
